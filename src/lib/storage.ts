@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LOCAL_SCORES_KEY = 'tf_local_scores';
 const PLAYER_NAME_KEY = 'tf_player_name';
+const TUTORIAL_SEEN_KEY = 'tf_tutorial_seen';
 
 export interface LocalScore {
   player_name: string;
@@ -42,5 +43,19 @@ export async function getSavedPlayerName(): Promise<string> {
 export async function savePlayerName(name: string): Promise<void> {
   try {
     await AsyncStorage.setItem(PLAYER_NAME_KEY, name);
+  } catch {}
+}
+
+export async function hasSeenTutorial(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(TUTORIAL_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markTutorialSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
   } catch {}
 }

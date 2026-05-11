@@ -7,50 +7,60 @@ interface Props {
 
 export function MultiplierBadge({ multiplier }: Props) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim  = useRef(new Animated.Value(0)).current;
   const prevMultiplier = useRef(multiplier);
 
   useEffect(() => {
-    if (multiplier !== prevMultiplier.current) {
-      prevMultiplier.current = multiplier;
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.4, duration: 150, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0.9, duration: 100, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1.15, duration: 100, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-      ]).start();
-    }
+    if (multiplier === prevMultiplier.current) return;
+    prevMultiplier.current = multiplier;
+
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(pulseAnim, { toValue: 1.45, tension: 400, friction: 5, useNativeDriver: true }),
+        Animated.timing(glowAnim,  { toValue: 1, duration: 120, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(pulseAnim, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }),
+        Animated.timing(glowAnim,  { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
   }, [multiplier]);
 
   return (
     <Animated.View style={[styles.badge, { transform: [{ scale: pulseAnim }] }]}>
-      <Text style={styles.label}>MULTIPLIER</Text>
-      <Text style={styles.value}>{multiplier.toFixed(1)}x</Text>
+      <Text style={styles.label}>MULT</Text>
+      <Text style={styles.value}>{multiplier.toFixed(1)}×</Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
-    backgroundColor: '#FFD600',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,214,0,0.15)',
+    borderWidth: 1.5,
+    borderColor: '#FFD600',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#FFD600',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 6,
+    shadowRadius: 8,
   },
   label: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#5D4037',
-    letterSpacing: 1.5,
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(255,214,0,0.75)',
+    letterSpacing: 2,
   },
   value: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    color: '#3E2723',
+    color: '#FFD600',
+    textShadowColor: '#FFD600',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
   },
 });

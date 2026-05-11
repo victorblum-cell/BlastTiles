@@ -1,16 +1,18 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Board, COLS, ROWS } from '../lib/gameLogic';
+import { Board } from '../lib/gameLogic';
+import { CellMode } from './ModeToggle';
 import { Cell } from './Cell';
 
 interface Props {
   board: Board;
   onReveal: (row: number, col: number) => void;
   onFlag: (row: number, col: number) => void;
+  mode: CellMode;
   isGameOver?: boolean;
 }
 
-export function MinesweeperGrid({ board, onReveal, onFlag, isGameOver }: Props) {
+export function MinesweeperGrid({ board, onReveal, onFlag, mode }: Props) {
   return (
     <View style={styles.grid}>
       {board.map((row, r) => (
@@ -19,9 +21,7 @@ export function MinesweeperGrid({ board, onReveal, onFlag, isGameOver }: Props) 
             <Cell
               key={c}
               cell={cell}
-              onPress={() => onReveal(r, c)}
-              onLongPress={() => onFlag(r, c)}
-              isGameOver={isGameOver}
+              onPress={() => (mode === 'reveal' ? onReveal(r, c) : onFlag(r, c))}
             />
           ))}
         </View>
@@ -31,10 +31,6 @@ export function MinesweeperGrid({ board, onReveal, onFlag, isGameOver }: Props) 
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    alignSelf: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-  },
+  grid: { alignSelf: 'center' },
+  row: { flexDirection: 'row' },
 });
