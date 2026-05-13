@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -9,8 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import { getPersonalBest, LocalScore } from '../lib/storage';
+import { useSounds } from '../hooks/useSounds';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Start'>;
 
@@ -96,6 +99,14 @@ export function StartScreen({ navigation }: Props) {
   const btnScale  = useRef(new Animated.Value(1)).current;
   const titleAnim = useRef(new Animated.Value(0)).current;
   const btnAnim   = useRef(new Animated.Value(0)).current;
+  const [personalBest, setPersonalBest] = useState<LocalScore | null>(null);
+  const play = useSounds();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      getPersonalBest().then(setPersonalBest);
+    }, [])
+  );
 
   useEffect(() => {
     Animated.stagger(120, [
@@ -105,6 +116,7 @@ export function StartScreen({ navigation }: Props) {
   }, []);
 
   function handlePlay() {
+    play('click');
     Animated.sequence([
       Animated.timing(btnScale, { toValue: 0.92, duration: 80, useNativeDriver: true }),
       Animated.timing(btnScale, { toValue: 1,    duration: 80, useNativeDriver: true }),
@@ -175,10 +187,19 @@ export function StartScreen({ navigation }: Props) {
 
         {/* Rules */}
         <View style={styles.rulesRow}>
-          <Text style={styles.ruleChip}>7 × 12</Text>
-          <Text style={styles.ruleChip}>18 MINES</Text>
+          <Text style={styles.ruleChip}>4×7 → ∞</Text>
+          <Text style={styles.ruleChip}>~20% MINES</Text>
           <Text style={styles.ruleChip}>1 LIFE</Text>
         </View>
+
+        {/* Personal best */}
+        {personalBest && (
+          <View style={styles.personalBest}>
+            <Text style={styles.pbLabel}>YOUR BEST</Text>
+            <Text style={styles.pbScore}>{personalBest.total_score.toLocaleString()}</Text>
+            <Text style={styles.pbMeta}>{personalBest.rooms_cleared} room{personalBest.rooms_cleared !== 1 ? 's' : ''} · {personalBest.player_name}</Text>
+          </View>
+        )}
       </Animated.View>
     </View>
   );
@@ -319,5 +340,36 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  personalBest: {
+    alignItems: 'center',
+    marginTop: 12,
+    backgroundColor: 'rgba(255,214,0,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,214,0,0.3)',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
+  pbLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(255,214,0,0.6)',
+    letterSpacing: 2,
+    marginBottom: 2,
+  },
+  pbScore: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFD600',
+    letterSpacing: 1,
+    textShadowColor: '#FFD600',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
+  },
+  pbMeta: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: 2,
   },
 });

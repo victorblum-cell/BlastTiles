@@ -59,3 +59,8 @@ export async function markTutorialSeen(): Promise<void> {
     await AsyncStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
   } catch {}
 }
+
+export async function getPersonalBest(): Promise<LocalScore | null> {
+  const scores = await getLocalScores();
+  return scores.length > 0 ? scores[0] : null;
+}

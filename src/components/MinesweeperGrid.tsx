@@ -10,9 +10,11 @@ interface Props {
   onFlag: (row: number, col: number) => void;
   mode: CellMode;
   isGameOver?: boolean;
+  cellSize?: number;
+  skinIndex?: number;
 }
 
-export function MinesweeperGrid({ board, onReveal, onFlag, mode }: Props) {
+export function MinesweeperGrid({ board, onReveal, onFlag, mode, cellSize, skinIndex = 0 }: Props) {
   return (
     <View style={styles.grid}>
       {board.map((row, r) => (
@@ -21,6 +23,8 @@ export function MinesweeperGrid({ board, onReveal, onFlag, mode }: Props) {
             <Cell
               key={c}
               cell={cell}
+              size={cellSize}
+              skinIndex={skinIndex}
               onPress={() => (mode === 'reveal' ? onReveal(r, c) : onFlag(r, c))}
             />
           ))}
@@ -32,5 +36,5 @@ export function MinesweeperGrid({ board, onReveal, onFlag, mode }: Props) {
 
 const styles = StyleSheet.create({
   grid: { alignSelf: 'center' },
-  row: { flexDirection: 'row' },
+  row:  { flexDirection: 'row' },
 });

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   Board,
   createEmptyBoard,
+  getBoardDimensions,
   isBoardCleared,
   placeMines,
   revealAllMines,
@@ -27,20 +28,28 @@ export interface RoomResult {
   totalAfterRoom: number;
 }
 
+function freshBoard(roomNumber: number) {
+  const { cols, rows } = getBoardDimensions(roomNumber);
+  return createEmptyBoard(cols, rows);
+}
+
 export function useGameState() {
-  const [board, setBoard] = useState<Board>(createEmptyBoard());
+  const initBoard = freshBoard(1);
+  const [board, setBoard] = useState<Board>(initBoard);
   const [phase, setPhase] = useState<GamePhase>('playing');
   const [roomNumber, setRoomNumber] = useState(1);
   const [totalScore, setTotalScore] = useState(0);
   const [roomPoints, setRoomPoints] = useState(0);
   const [roomResult, setRoomResult] = useState<RoomResult | null>(null);
+  const [revealCount, setRevealCount] = useState(0);
 
-  // Mutable refs so closures in handleReveal always see latest values
-  const boardRef = useRef<Board>(createEmptyBoard());
-  const minesPlaced = useRef(false);
-  const roomPointsRef = useRef(0);
-  const totalScoreRef = useRef(0);
-  const roomNumberRef = useRef(1);
+  const boardRef       = useRef<Board>(initBoard);
+  const minesPlaced    = useRef(false);
+  const roomPointsRef  = useRef(0);
+  const totalScoreRef  = useRef(0);
+  const roomNumberRef  = useRef(1);
+  const mineCountRef   = useRef(getBoardDimensions(1).mineCount);
+  const revealCountRef = useRef(0);
 
   const { streak, registerReveal, resetCombo } = useCombo();
 
@@ -52,7 +61,7 @@ export function useGameState() {
     let current = boardRef.current;
 
     if (!minesPlaced.current) {
-      current = placeMines(current, row, col);
+      current = placeMines(current, row, col, mineCountRef.current);
       minesPlaced.current = true;
     }
 
@@ -69,32 +78,26 @@ export function useGameState() {
     const { board: next, revealed } = revealCell(current, row, col);
     boardRef.current = next;
 
-    // registerReveal must run outside setBoard to avoid double-invocation in Strict Mode
-    const newStreak = registerReveal();
+    const newStreak  = registerReveal();
     const comboBonus = revealed === 1 ? getComboBonus(newStreak) : 0;
-    const pts = revealed * POINTS_PER_CELL + comboBonus;
-
+    const pts        = revealed * POINTS_PER_CELL + comboBonus;
     const newRoomPts = roomPointsRef.current + pts;
     roomPointsRef.current = newRoomPts;
 
+    revealCountRef.current += 1;
+    setRevealCount(revealCountRef.current);
     setBoard(next);
     setRoomPoints(newRoomPts);
 
     if (isBoardCleared(next)) {
-      const bonus = ROOM_CLEAR_BONUS;
+      const bonus     = ROOM_CLEAR_BONUS;
       const roomTotal = newRoomPts + bonus;
-      const m = computeMultiplier(roomNumberRef.current - 1);
+      const m         = computeMultiplier(roomNumberRef.current - 1);
       const finalRoom = applyMultiplier(roomTotal, m);
-      const newTotal = totalScoreRef.current + finalRoom;
+      const newTotal  = totalScoreRef.current + finalRoom;
       totalScoreRef.current = newTotal;
-
       setTotalScore(newTotal);
-      setRoomResult({
-        roomPoints: roomTotal,
-        multiplier: m,
-        bonusPoints: bonus,
-        totalAfterRoom: newTotal,
-      });
+      setRoomResult({ roomPoints: roomTotal, multiplier: m, bonusPoints: bonus, totalAfterRoom: newTotal });
       setPhase('cleared');
     }
   }, [phase, registerReveal]);
@@ -110,7 +113,9 @@ export function useGameState() {
     const nextRoom = roomNumberRef.current + 1;
     roomNumberRef.current = nextRoom;
     roomPointsRef.current = 0;
-    const fresh = createEmptyBoard();
+    const { mineCount } = getBoardDimensions(nextRoom);
+    mineCountRef.current = mineCount;
+    const fresh = freshBoard(nextRoom);
     boardRef.current = fresh;
     minesPlaced.current = false;
     setBoard(fresh);
@@ -122,10 +127,12 @@ export function useGameState() {
   }, [resetCombo]);
 
   const restartGame = useCallback(() => {
-    roomNumberRef.current = 1;
-    roomPointsRef.current = 0;
-    totalScoreRef.current = 0;
-    const fresh = createEmptyBoard();
+    roomNumberRef.current  = 1;
+    roomPointsRef.current  = 0;
+    totalScoreRef.current  = 0;
+    mineCountRef.current   = getBoardDimensions(1).mineCount;
+    revealCountRef.current = 0;
+    const fresh = freshBoard(1);
     boardRef.current = fresh;
     minesPlaced.current = false;
     setBoard(fresh);
@@ -134,6 +141,7 @@ export function useGameState() {
     setTotalScore(0);
     setRoomPoints(0);
     setRoomResult(null);
+    setRevealCount(0);
     resetCombo();
   }, [resetCombo]);
 
@@ -146,10 +154,11 @@ export function useGameState() {
     roomResult,
     multiplier,
     streak,
+    revealCount,
     handleReveal,
     handleFlag,
     startNextRoom,
     restartGame,
-    remainingMines: getRemainingMines(board),
+    remainingMines: getRemainingMines(board, mineCountRef.current),
   };
 }

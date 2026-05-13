@@ -4,16 +4,20 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useGame } from '../context/GameContext';
+import { getBoardDimensions } from '../lib/gameLogic';
+import { useSounds } from '../hooks/useSounds';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomClear'>;
 
 export function RoomClearScreen({ navigation }: Props) {
   const game = useGame();
+  const play = useSounds();
   const roomResult = game.roomResult;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
 
   useEffect(() => {
+    play('clear');
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 120, friction: 8 }),
@@ -43,9 +47,14 @@ export function RoomClearScreen({ navigation }: Props) {
           <Row label="Running total" value={roomResult.totalAfterRoom.toLocaleString()} big />
         </View>
 
-        <Text style={styles.nextHint}>
-          Next: Room {game.roomNumber + 1} · {(roomResult.multiplier + 0.2).toFixed(1)}x multiplier
-        </Text>
+        {(() => {
+          const next = getBoardDimensions(game.roomNumber + 1);
+          return (
+            <Text style={styles.nextHint}>
+              Next: Room {game.roomNumber + 1} · {next.cols}×{next.rows} · {next.mineCount} mines · {(roomResult.multiplier + 0.2).toFixed(1)}x
+            </Text>
+          );
+        })()}
 
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextText}>NEXT ROOM →</Text>
