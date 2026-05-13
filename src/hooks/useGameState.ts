@@ -42,6 +42,7 @@ export function useGameState() {
   const [roomPoints, setRoomPoints] = useState(0);
   const [roomResult, setRoomResult] = useState<RoomResult | null>(null);
   const [revealCount, setRevealCount] = useState(0);
+  const [roomTheme, setRoomTheme] = useState<number>(() => Math.floor(Math.random() * 5));
 
   const boardRef       = useRef<Board>(initBoard);
   const minesPlaced    = useRef(false);
@@ -123,6 +124,7 @@ export function useGameState() {
     setRoomResult(null);
     setPhase('playing');
     setRoomNumber(nextRoom);
+    setRoomTheme(Math.floor(Math.random() * 5));
     resetCombo();
   }, [resetCombo]);
 
@@ -142,6 +144,7 @@ export function useGameState() {
     setRoomPoints(0);
     setRoomResult(null);
     setRevealCount(0);
+    setRoomTheme(Math.floor(Math.random() * 5));
     resetCombo();
   }, [resetCombo]);
 
@@ -155,6 +158,7 @@ export function useGameState() {
     multiplier,
     streak,
     revealCount,
+    roomTheme,
     handleReveal,
     handleFlag,
     startNextRoom,

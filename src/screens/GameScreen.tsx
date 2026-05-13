@@ -10,7 +10,7 @@ import { MultiplierBadge } from '../components/MultiplierBadge';
 import { ScoreDisplay } from '../components/ScoreDisplay';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import { SettingsModal } from '../components/SettingsModal';
-import { TILE_SKINS } from '../components/Cell';
+import { THEME_CONFIG, THEME_GRID_BG, RoomTheme } from '../components/TileBackground';
 import { useGame } from '../context/GameContext';
 import { useSounds } from '../hooks/useSounds';
 import { useTutorial } from '../hooks/useTutorial';
@@ -109,8 +109,8 @@ export function GameScreen({ navigation }: Props) {
     game.handleFlag(row, col);
   }
 
-  // Skin cycles every 5 reveals (8 skins total)
-  const skinIndex = Math.floor(game.revealCount / 5) % 8;
+  // Theme is randomly chosen per room (set in useGameState)
+  const roomTheme = game.roomTheme as RoomTheme;
 
   // Compute cell size so the grid fits the screen at every room size
   const cols = game.board[0]?.length ?? 4;
@@ -160,7 +160,14 @@ export function GameScreen({ navigation }: Props) {
 
       {/* Neon-bordered grid */}
       <Animated.View style={[styles.gridWrapper, slide(gridAnim, 28)]}>
-        <View style={[styles.gridBorder, { borderColor: TILE_SKINS[skinIndex].borderColor, shadowColor: TILE_SKINS[skinIndex].borderColor }]}>
+        <View style={[
+          styles.gridBorder,
+          {
+            backgroundColor: THEME_GRID_BG[roomTheme],
+            borderColor:     THEME_CONFIG[roomTheme].hiddenBotColor,
+            shadowColor:     THEME_CONFIG[roomTheme].shadowColor,
+          },
+        ]}>
           <MinesweeperGrid
             board={game.board}
             onReveal={tutorial.visible ? () => {} : handleRevealWithSound}
@@ -168,7 +175,7 @@ export function GameScreen({ navigation }: Props) {
             mode={mode}
             isGameOver={game.phase === 'dead'}
             cellSize={cellSize}
-            skinIndex={skinIndex}
+            roomTheme={roomTheme}
           />
           <GlowOverlay area="grid" />
         </View>
