@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { ComboText } from '../components/ComboText';
@@ -10,12 +10,22 @@ import { MultiplierBadge } from '../components/MultiplierBadge';
 import { ScoreDisplay } from '../components/ScoreDisplay';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import { SettingsModal } from '../components/SettingsModal';
-import { THEME_CONFIG, THEME_GRID_BG, RoomTheme } from '../components/TileBackground';
+import { THEME_CONFIG, THEME_GRID_BG, THEME_BACKGROUND, RoomTheme } from '../components/TileBackground';
 import { useGame } from '../context/GameContext';
 import { useSounds } from '../hooks/useSounds';
 import { useTutorial } from '../hooks/useTutorial';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
+
+function formatTimer(ms: number): string {
+  const totalSecs = ms / 1000;
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  if (mins > 0) {
+    return `${String(mins).padStart(2, '0')}:${secs.toFixed(1).padStart(4, '0')}`;
+  }
+  return `${secs.toFixed(1).padStart(4, '0')}`;
+}
 
 export function GameScreen({ navigation }: Props) {
   const game = useGame();
@@ -24,6 +34,8 @@ export function GameScreen({ navigation }: Props) {
   const play = useSounds();
   const [mode, setMode] = useState<CellMode>('reveal');
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const isTimeMode = game.gameMode === 'time';
 
   const prevStreak = useRef(game.streak);
   const prevMultiplier = useRef(game.multiplier);
@@ -50,9 +62,11 @@ export function GameScreen({ navigation }: Props) {
   useEffect(() => {
     if (prevPhase.current === game.phase) return;
     prevPhase.current = game.phase;
-    if (game.phase === 'cleared') navigation.navigate('RoomClear');
+    if (game.phase === 'cleared') {
+      if (isTimeMode) navigation.navigate('TimeComplete');
+      else navigation.navigate('RoomClear');
+    }
     if (game.phase === 'dead') {
-      // Small delay so the mine explosion sound can start before screen transition
       setTimeout(() => navigation.navigate('GameOver'), 320);
     }
   }, [game.phase]);
@@ -109,18 +123,17 @@ export function GameScreen({ navigation }: Props) {
     game.handleFlag(row, col);
   }
 
-  // Theme is randomly chosen per room (set in useGameState)
   const roomTheme = game.roomTheme as RoomTheme;
 
-  // Compute cell size so the grid fits the screen at every room size
   const cols = game.board[0]?.length ?? 4;
   const rows = game.board.length ?? 7;
   const { width: SW, height: SH } = Dimensions.get('window');
-  const availW = SW - 64;          // container padding + border + 40px margin
-  const availH = SH - 440;         // header + score + toggle + 120px bottom reserve + safe area + 40px margin
+  const { width: screenW, height: screenH } = Dimensions.get('screen');
+  const availW = SW - 32;
+  const availH = SH - 340;
   const sizeFromW = Math.floor(availW / cols) - 4;
   const sizeFromH = Math.floor(availH / rows) - 4;
-  const cellSize = Math.max(20, Math.min(52, sizeFromW, sizeFromH));
+  const cellSize = Math.max(20, Math.min(88, sizeFromW, sizeFromH));
 
   const slide = (anim: Animated.Value, dy: number) => ({
     opacity: anim,
@@ -130,14 +143,21 @@ export function GameScreen({ navigation }: Props) {
   });
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#060D30', '#080F3A', '#0D1550']} style={StyleSheet.absoluteFill} />
+    <View style={{ flex: 1 }}>
+      {THEME_BACKGROUND[roomTheme]
+        ? <Image source={THEME_BACKGROUND[roomTheme]!} style={{ position: 'absolute', top: 0, left: 0, width: screenW, height: screenH }} resizeMode="cover" />
+        : <LinearGradient colors={['#060D30', '#080F3A', '#0D1550']} style={StyleSheet.absoluteFill} />
+      }
+      <View style={styles.container}>
 
       {/* Header row */}
       <Animated.View style={[styles.header, slide(headerAnim, -20)]}>
-        <Text style={styles.roomLabel}>ROOM {game.roomNumber}</Text>
+        {isTimeMode
+          ? <Text style={styles.roomLabel}>9 × 14</Text>
+          : <Text style={styles.roomLabel}>ROOM {game.roomNumber}</Text>
+        }
         <View style={styles.headerRight}>
-          <MultiplierBadge multiplier={game.multiplier} />
+          {!isTimeMode && <MultiplierBadge multiplier={game.multiplier} />}
           <TouchableOpacity
             style={styles.gearBtn}
             onPress={() => setSettingsOpen(true)}
@@ -149,12 +169,19 @@ export function GameScreen({ navigation }: Props) {
         <GlowOverlay area="multiplier" />
       </Animated.View>
 
-      {/* Score boxes */}
+      {/* Score / Timer */}
       <Animated.View style={slide(scoreAnim, -14)}>
-        <ScoreDisplay
-          totalScore={game.totalScore}
-          roomPoints={game.roomPoints}
-        />
+        {isTimeMode ? (
+          <View style={styles.timerContainer}>
+            <Text style={styles.timerLabel}>TIME</Text>
+            <Text style={styles.timerValue}>{formatTimer(game.timeMs)}</Text>
+          </View>
+        ) : (
+          <ScoreDisplay
+            totalScore={game.totalScore}
+            roomPoints={game.roomPoints}
+          />
+        )}
         <GlowOverlay area="score" />
       </Animated.View>
 
@@ -187,8 +214,7 @@ export function GameScreen({ navigation }: Props) {
         <ModeToggle mode={mode} onModeChange={setMode} />
       </Animated.View>
 
-      {/* 120px bottom reserve — shifts grid + toggle upward */}
-      <View style={{ height: 120 }} />
+      <View style={{ height: 16 }} />
 
       <TutorialOverlay
         visible={tutorial.visible}
@@ -210,6 +236,7 @@ export function GameScreen({ navigation }: Props) {
           game.restartGame();
         }}
       />
+      </View>
     </View>
   );
 }
@@ -218,7 +245,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 52,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   header: {
     flexDirection: 'row',
@@ -252,6 +279,28 @@ const styles = StyleSheet.create({
   },
   gearIcon: {
     fontSize: 18,
+  },
+  // Timer display
+  timerContainer: {
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingVertical: 6,
+  },
+  timerLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: 'rgba(255,180,0,0.7)',
+    letterSpacing: 3,
+    marginBottom: 2,
+  },
+  timerValue: {
+    fontSize: 52,
+    fontWeight: '900',
+    color: '#FFB300',
+    letterSpacing: 2,
+    textShadowColor: '#FFB300',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
   gridWrapper: {
     flex: 1,

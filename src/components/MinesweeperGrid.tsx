@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Board } from '../lib/gameLogic';
 import { CellMode } from './ModeToggle';
@@ -15,7 +15,12 @@ interface Props {
   roomTheme?: RoomTheme;
 }
 
-export function MinesweeperGrid({ board, onReveal, onFlag, mode, cellSize, roomTheme = 0 }: Props) {
+function MinesweeperGridComponent({ board, onReveal, onFlag, mode, cellSize, roomTheme = 0 }: Props) {
+  const handlePress = useCallback((r: number, c: number) => {
+    if (mode === 'reveal') onReveal(r, c);
+    else onFlag(r, c);
+  }, [mode, onReveal, onFlag]);
+
   return (
     <View style={styles.grid}>
       {board.map((row, r) => (
@@ -27,7 +32,7 @@ export function MinesweeperGrid({ board, onReveal, onFlag, mode, cellSize, roomT
               size={cellSize}
               roomTheme={roomTheme}
               cellVariant={(r * 5 + c * 3) % 4}
-              onPress={() => (mode === 'reveal' ? onReveal(r, c) : onFlag(r, c))}
+              onPress={() => handlePress(r, c)}
             />
           ))}
         </View>
@@ -35,6 +40,8 @@ export function MinesweeperGrid({ board, onReveal, onFlag, mode, cellSize, roomT
     </View>
   );
 }
+
+export const MinesweeperGrid = React.memo(MinesweeperGridComponent);
 
 const styles = StyleSheet.create({
   grid: { alignSelf: 'center' },

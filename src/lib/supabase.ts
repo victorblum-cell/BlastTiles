@@ -27,3 +27,24 @@ export async function fetchGlobalLeaderboard(): Promise<ScoreEntry[]> {
   if (error) return [];
   return data ?? [];
 }
+
+export interface TimeScoreEntry {
+  id?: string;
+  player_name: string;
+  time_ms: number;
+  created_at?: string;
+}
+
+export async function submitTimeScore(entry: Omit<TimeScoreEntry, 'id' | 'created_at'>): Promise<void> {
+  await supabase.from('time_scores').insert([entry]);
+}
+
+export async function fetchGlobalTimeLeaderboard(): Promise<TimeScoreEntry[]> {
+  const { data, error } = await supabase
+    .from('time_scores')
+    .select('*')
+    .order('time_ms', { ascending: true })
+    .limit(50);
+  if (error) return [];
+  return data ?? [];
+}

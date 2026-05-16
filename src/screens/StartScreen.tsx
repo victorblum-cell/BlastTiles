@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
-import { getPersonalBest, LocalScore } from '../lib/storage';
+import { RootStackParamList, GameMode } from '../../App';
+import { getPersonalBest, getPersonalBestTime, getStreak, LocalScore, TimeScore, StreakData } from '../lib/storage';
 import { useSounds } from '../hooks/useSounds';
+import { useGame } from '../context/GameContext';
+import { StreakBadge } from '../components/StreakBadge';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Start'>;
 
@@ -76,16 +78,13 @@ function PerspectiveFloor() {
   return (
     <View style={styles.floorOuter} pointerEvents="none">
       <View style={styles.floorPerspective}>
-        {/* Horizontal lines */}
         {Array.from({ length: ROWS + 1 }).map((_, i) => (
           <View key={`h${i}`} style={[styles.hLine, { top: `${(i / ROWS) * 100}%` }]} />
         ))}
-        {/* Vertical lines */}
         {Array.from({ length: COLS + 1 }).map((_, i) => (
           <View key={`v${i}`} style={[styles.vLine, { left: `${(i / COLS) * 100}%` }]} />
         ))}
       </View>
-      {/* Fade out top of floor */}
       <LinearGradient
         colors={['#060D30', 'transparent']}
         style={StyleSheet.absoluteFill}
@@ -95,16 +94,30 @@ function PerspectiveFloor() {
   );
 }
 
+function formatTime(ms: number): string {
+  const totalSecs = ms / 1000;
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  if (mins > 0) return `${mins}:${secs.toFixed(1).padStart(4, '0')}`;
+  return `${secs.toFixed(1)}s`;
+}
+
 export function StartScreen({ navigation }: Props) {
+  const game = useGame();
   const btnScale  = useRef(new Animated.Value(1)).current;
+  const timeBtnScale = useRef(new Animated.Value(1)).current;
   const titleAnim = useRef(new Animated.Value(0)).current;
   const btnAnim   = useRef(new Animated.Value(0)).current;
   const [personalBest, setPersonalBest] = useState<LocalScore | null>(null);
+  const [personalBestTime, setPersonalBestTime] = useState<TimeScore | null>(null);
+  const [streak, setStreak] = useState<StreakData>({ currentStreak: 0, lastPlayedDate: '', longestStreak: 0 });
   const play = useSounds();
 
   useFocusEffect(
     React.useCallback(() => {
       getPersonalBest().then(setPersonalBest);
+      getPersonalBestTime().then(setPersonalBestTime);
+      getStreak().then(setStreak);
     }, [])
   );
 
@@ -115,28 +128,33 @@ export function StartScreen({ navigation }: Props) {
     ]).start();
   }, []);
 
-  function handlePlay() {
+  function handlePlay(mode: GameMode, scaleAnim: Animated.Value) {
     play('click');
     Animated.sequence([
-      Animated.timing(btnScale, { toValue: 0.92, duration: 80, useNativeDriver: true }),
-      Animated.timing(btnScale, { toValue: 1,    duration: 80, useNativeDriver: true }),
-    ]).start(() => navigation.navigate('Game'));
+      Animated.timing(scaleAnim, { toValue: 0.92, duration: 80, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1,    duration: 80, useNativeDriver: true }),
+    ]).start(() => {
+      game.setGameMode(mode);
+      navigation.navigate('Game');
+    });
   }
 
   return (
     <View style={styles.root}>
       <LinearGradient colors={['#060D30', '#0E1858', '#1A2580']} style={StyleSheet.absoluteFill} />
 
-      {/* Floating background shapes */}
       {SHAPES.map((s, i) => <FloatingShape key={i} {...s} index={i} />)}
-
-      {/* Perspective floor */}
       <PerspectiveFloor />
-
-      {/* Horizon glow line */}
       <View style={styles.horizonGlow} pointerEvents="none" />
 
-      {/* Content */}
+      {/* Streak badge — top right corner */}
+      {streak.currentStreak > 0 && (
+        <View style={styles.streakCorner} pointerEvents="none">
+          <StreakBadge streak={streak.currentStreak} />
+        </View>
+      )}
+
+      {/* Title */}
       <Animated.View
         style={[
           styles.content,
@@ -146,7 +164,6 @@ export function StartScreen({ navigation }: Props) {
           },
         ]}
       >
-        {/* Title */}
         <View style={styles.titleBox}>
           <Text style={[styles.titleWord, { color: '#00CFFF' }]}>TRIGGER</Text>
           <View style={styles.titleRow}>
@@ -157,6 +174,7 @@ export function StartScreen({ navigation }: Props) {
         </View>
       </Animated.View>
 
+      {/* Buttons */}
       <Animated.View
         style={[
           styles.buttons,
@@ -166,40 +184,71 @@ export function StartScreen({ navigation }: Props) {
           },
         ]}
       >
-        {/* Play button */}
+        {/* INFINITE MODE */}
         <Animated.View style={{ transform: [{ scale: btnScale }] }}>
-          <TouchableOpacity style={styles.playBtn} onPress={handlePlay} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.playBtn}
+            onPress={() => handlePlay('infinite', btnScale)}
+            activeOpacity={0.85}
+          >
             <LinearGradient
               colors={['rgba(0,200,255,0.25)', 'rgba(0,100,200,0.15)']}
               style={styles.playBtnGradient}
             >
-              <Text style={styles.playBtnText}>NEW GAME</Text>
+              <Text style={styles.modeBtnLabel}>INFINITE MODE</Text>
+              <Text style={styles.modeBtnSub}>4×7 → ∞  ·  Score attack</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Secondary links */}
+        {/* TIME MODE */}
+        <Animated.View style={{ transform: [{ scale: timeBtnScale }] }}>
+          <TouchableOpacity
+            style={[styles.playBtn, styles.timeBtn]}
+            onPress={() => handlePlay('time', timeBtnScale)}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['rgba(255,180,0,0.22)', 'rgba(200,100,0,0.12)']}
+              style={styles.playBtnGradient}
+            >
+              <Text style={[styles.modeBtnLabel, styles.timeBtnLabel]}>TIME MODE</Text>
+              <Text style={styles.modeBtnSub}>9×14  ·  Fastest clear wins</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Leaderboard */}
         <View style={styles.links}>
           <TouchableOpacity onPress={() => navigation.navigate('Leaderboard')}>
             <Text style={styles.linkText}>🏆  LEADERBOARD</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Rules */}
-        <View style={styles.rulesRow}>
-          <Text style={styles.ruleChip}>4×7 → ∞</Text>
-          <Text style={styles.ruleChip}>~20% MINES</Text>
-          <Text style={styles.ruleChip}>1 LIFE</Text>
+        {/* Personal bests */}
+        <View style={styles.pbRow}>
+          {personalBest && (
+            <View style={styles.personalBest}>
+              <Text style={styles.pbLabel}>INFINITE BEST</Text>
+              <Text style={styles.pbScore}>{personalBest.total_score.toLocaleString()}</Text>
+              <Text style={styles.pbMeta}>{personalBest.rooms_cleared} room{personalBest.rooms_cleared !== 1 ? 's' : ''} · {personalBest.player_name}</Text>
+            </View>
+          )}
+          {personalBestTime && (
+            <View style={[styles.personalBest, styles.timeBest]}>
+              <Text style={[styles.pbLabel, { color: 'rgba(255,180,0,0.7)' }]}>TIME BEST</Text>
+              <Text style={[styles.pbScore, { color: '#FFB300' }]}>{formatTime(personalBestTime.time_ms)}</Text>
+              <Text style={styles.pbMeta}>{personalBestTime.player_name}</Text>
+            </View>
+          )}
+          {streak.longestStreak > 0 && (
+            <View style={[styles.personalBest, styles.streakBest]}>
+              <Text style={[styles.pbLabel, { color: 'rgba(255,107,0,0.7)' }]}>BEST STREAK</Text>
+              <Text style={[styles.pbScore, { color: '#FF6B00' }]}>{streak.longestStreak} 🔥</Text>
+              <Text style={styles.pbMeta}>days</Text>
+            </View>
+          )}
         </View>
-
-        {/* Personal best */}
-        {personalBest && (
-          <View style={styles.personalBest}>
-            <Text style={styles.pbLabel}>YOUR BEST</Text>
-            <Text style={styles.pbScore}>{personalBest.total_score.toLocaleString()}</Text>
-            <Text style={styles.pbMeta}>{personalBest.rooms_cleared} room{personalBest.rooms_cleared !== 1 ? 's' : ''} · {personalBest.player_name}</Text>
-          </View>
-        )}
       </Animated.View>
     </View>
   );
@@ -210,7 +259,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#060D30',
   },
-  /* Floor */
   floorOuter: {
     position: 'absolute',
     bottom: 0,
@@ -250,7 +298,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
-  /* Content */
   content: {
     flex: 1,
     alignItems: 'center',
@@ -285,11 +332,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: '600',
   },
-  /* Buttons */
   buttons: {
     alignItems: 'center',
     paddingBottom: H * 0.4,
-    gap: 16,
+    gap: 12,
   },
   playBtn: {
     borderRadius: 22,
@@ -302,22 +348,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.7,
     shadowRadius: 16,
   },
+  timeBtn: {
+    borderColor: '#FFB300',
+    shadowColor: '#FFB300',
+  },
   playBtnGradient: {
-    paddingVertical: 18,
-    paddingHorizontal: 80,
+    paddingVertical: 14,
+    paddingHorizontal: 48,
     alignItems: 'center',
   },
-  playBtnText: {
-    fontSize: 26,
+  modeBtnLabel: {
+    fontSize: 22,
     fontWeight: '900',
     color: '#fff',
-    letterSpacing: 4,
+    letterSpacing: 3,
     textShadowColor: '#00CFFF',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
+  timeBtnLabel: {
+    textShadowColor: '#FFB300',
+  },
+  modeBtnSub: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 1,
+    marginTop: 3,
+    fontWeight: '600',
+  },
   links: {
     alignItems: 'center',
+    marginTop: 4,
   },
   linkText: {
     fontSize: 15,
@@ -325,31 +386,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1.5,
   },
-  rulesRow: {
+  pbRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
-  },
-  ruleChip: {
-    fontSize: 11,
-    color: 'rgba(0,200,255,0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,200,255,0.3)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    fontWeight: '700',
-    letterSpacing: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   personalBest: {
     alignItems: 'center',
-    marginTop: 12,
     backgroundColor: 'rgba(255,214,0,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,214,0,0.3)',
     borderRadius: 16,
     paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+  },
+  timeBest: {
+    backgroundColor: 'rgba(255,180,0,0.08)',
+    borderColor: 'rgba(255,180,0,0.3)',
   },
   pbLabel: {
     fontSize: 9,
@@ -359,7 +413,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   pbScore: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: '#FFD600',
     letterSpacing: 1,
@@ -371,5 +425,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.45)',
     marginTop: 2,
+  },
+  streakBest: {
+    backgroundColor: 'rgba(255,107,0,0.08)',
+    borderColor: 'rgba(255,107,0,0.3)',
+  },
+  streakCorner: {
+    position: 'absolute',
+    top: 52,
+    right: 16,
+    zIndex: 10,
   },
 });

@@ -66,26 +66,25 @@ const NUMBER_COLORS: Record<number, string> = {
 };
 
 interface Props {
-  cell:        CellState;
-  onPress:     () => void;
-  size?:       number;
-  roomTheme?:  RoomTheme;
+  cell:         CellState;
+  onPress:      () => void;
+  size?:        number;
+  roomTheme?:   RoomTheme;
   cellVariant?: number;
 }
 
-export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 }: Props) {
+function CellComponent({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 }: Props) {
   const scaleAnim   = useRef(new Animated.Value(1)).current;
   const rotateAnim  = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const flagScale   = useRef(new Animated.Value(0)).current;
 
-  const exitScale   = useRef(new Animated.Value(1)).current;
-  const exitRotate  = useRef(new Animated.Value(0)).current;
-  const exitTranslY = useRef(new Animated.Value(0)).current;
-  const exitOpacity = useRef(new Animated.Value(0)).current;
+  const exitScale    = useRef(new Animated.Value(1)).current;
+  const exitRotate   = useRef(new Animated.Value(0)).current;
+  const exitTranslY  = useRef(new Animated.Value(0)).current;
+  const exitOpacity  = useRef(new Animated.Value(0)).current;
   const exitThemeRef = useRef<RoomTheme>(roomTheme);
 
-  // ── Reveal animation ────────────────────────────────────────────────────
   useEffect(() => {
     if (!cell.isRevealed) return;
     if (cell.isMine) {
@@ -95,7 +94,6 @@ export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 
       ]).start();
       return;
     }
-    // Capture theme at reveal time for the exit overlay
     exitThemeRef.current = roomTheme;
     const cfg = THEME_CONFIG[roomTheme];
     exitOpacity.setValue(1);
@@ -111,7 +109,6 @@ export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 
     ]).start();
   }, [cell.isRevealed]);
 
-  // ── Flag animation ──────────────────────────────────────────────────────
   useEffect(() => {
     if (cell.isFlagged) {
       flagScale.setValue(0);
@@ -126,7 +123,6 @@ export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 
   const exitRot    = exitRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
   const exitTransY = exitTranslY.interpolate({ inputRange: [0, 1], outputRange: [0, size * 3.5] });
 
-  const isHidden   = !cell.isRevealed;
   const isFlagged  = cell.isFlagged && !cell.isRevealed;
   const isRevealed = cell.isRevealed && !cell.isMine;
   const isMine     = cell.isRevealed && cell.isMine;
@@ -135,7 +131,7 @@ export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 
   const textSize  = Math.max(10, Math.round(size * 0.44));
   const emojiSize = Math.max(9,  Math.round(size * 0.38));
 
-  const exitCfg        = THEME_CONFIG[exitThemeRef.current];
+  const exitCfg         = THEME_CONFIG[exitThemeRef.current];
   const exitBorderRadius = exitCfg.exitAnim === 'cheese-bite' ? size / 2 : radius;
 
   return (
@@ -144,71 +140,48 @@ export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 
       activeOpacity={0.75}
       disabled={cell.isRevealed && !cell.isMine}
     >
-      <Animated.View
-        style={[
-          styles.cell,
-          { width: size, height: size, borderRadius: radius },
-          // ── Hidden cell border (3-D raised look) ──
-          isHidden && {
-            borderBottomWidth: 3,
-            borderRightWidth:  2,
-            borderBottomColor: cfg.hiddenBotColor,
-            borderRightColor:  cfg.hiddenRightColor,
-            elevation:         cfg.elevation,
-            shadowColor:       cfg.shadowColor,
-            shadowOpacity:     cfg.shadowOpacity,
-            shadowOffset:      { width: 0, height: 2 },
-            shadowRadius:      4,
-          },
-          // ── Revealed cell ──
-          isRevealed && {
-            borderWidth:  1,
-            borderColor:  cfg.revealedBorder,
-          },
-          // ── Mine (always red) ──
-          isMine && styles.mine,
-          { opacity: opacityAnim, transform: [{ scale: scaleAnim }, { rotate }] },
-        ]}
-      >
-        {/* ── Themed tile background (hidden & revealed) ── */}
-        {!isMine && (
-          <TileBackground
-            theme={roomTheme}
-            variant={cellVariant}
-            isRevealed={cell.isRevealed}
-            size={size}
-          />
-        )}
+      {/* Static View clips content — no native-driver animations here, so no forced GPU layer per cell */}
+      <View style={[styles.clip, { width: size, height: size, borderRadius: radius }]}>
 
-        {/* ── Gloss highlight on top (marble & melon only) ── */}
-        {isHidden && cfg.gloss && (
-          <View style={[
-            styles.gloss,
-            { borderRadius: radius - 1, backgroundColor: cfg.gloss },
-          ]} />
-        )}
+        {/* Animated View fills parent — transforms/opacity only, no overflow constraint */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { borderRadius: radius },
+            isMine && styles.mine,
+            { opacity: opacityAnim, transform: [{ scale: scaleAnim }, { rotate }] },
+          ]}
+        >
+          {!isMine && (
+            <TileBackground
+              theme={roomTheme}
+              variant={cellVariant}
+              isRevealed={cell.isRevealed}
+            />
+          )}
 
-        {/* ── Flag ── */}
-        {isFlagged && (
-          <Animated.View style={{ transform: [{ scale: flagScale }] }}>
-            <FlagIcon size={emojiSize} poleColor={cfg.flagPoleColor} flagColor="#FF3B30" />
-          </Animated.View>
-        )}
+          {isFlagged && (
+            <Animated.View style={[StyleSheet.absoluteFill, styles.center, { transform: [{ scale: flagScale }] }]}>
+              <FlagIcon size={emojiSize} poleColor={cfg.flagPoleColor} flagColor="#FF3B30" />
+            </Animated.View>
+          )}
 
-        {/* ── Mine ── */}
-        {isMine && <Text style={[styles.cellText, { fontSize: emojiSize }]}>💣</Text>}
+          {isMine && (
+            <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+              <Text style={[styles.cellText, { fontSize: emojiSize }]}>💣</Text>
+            </View>
+          )}
 
-        {/* ── Number ── */}
-        {isRevealed && cell.adjacentMines > 0 && (
-          <Text style={[
-            styles.number,
-            { fontSize: textSize, color: NUMBER_COLORS[cell.adjacentMines] ?? '#fff' },
-          ]}>
-            {cell.adjacentMines}
-          </Text>
-        )}
+          {isRevealed && cell.adjacentMines > 0 && (
+            <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+              <Text style={[styles.number, { fontSize: textSize, color: NUMBER_COLORS[cell.adjacentMines] ?? '#fff' }]}>
+                {cell.adjacentMines}
+              </Text>
+            </View>
+          )}
+        </Animated.View>
 
-        {/* ── Exit animation overlay ── */}
+        {/* Exit animation overlay — sibling of animated view, inside clip */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -225,30 +198,26 @@ export function Cell({ cell, onPress, size = 40, roomTheme = 0, cellVariant = 0 
             },
           ]}
         />
-      </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 }
 
+export const Cell = React.memo(CellComponent);
+
 const styles = StyleSheet.create({
-  cell: {
+  clip: {
     margin: 2,
+    overflow: 'hidden',
+  },
+  center: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
   mine: {
     backgroundColor: '#FF3B30',
-    elevation: 8,
-    shadowColor: '#FF3B30',
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  gloss: {
-    position: 'absolute',
-    top: 2, left: 3, right: 3,
-    height: '38%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   number: {
     fontWeight: '900',

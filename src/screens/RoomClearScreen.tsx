@@ -6,6 +6,7 @@ import { RootStackParamList } from '../../App';
 import { useGame } from '../context/GameContext';
 import { getBoardDimensions } from '../lib/gameLogic';
 import { useSounds } from '../hooks/useSounds';
+import { recordPlay } from '../lib/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomClear'>;
 
@@ -18,6 +19,7 @@ export function RoomClearScreen({ navigation }: Props) {
 
   useEffect(() => {
     play('clear');
+    recordPlay();
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 120, friction: 8 }),

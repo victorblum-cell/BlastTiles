@@ -22,7 +22,16 @@ import {
   LocalScore,
   saveLocalScore,
   savePlayerName,
+  recordPlay,
 } from '../lib/storage';
+
+function formatTime(ms: number): string {
+  const totalSecs = ms / 1000;
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  if (mins > 0) return `${mins}:${secs.toFixed(1).padStart(4, '0')}`;
+  return `${secs.toFixed(1)}s`;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GameOver'>;
 
@@ -31,6 +40,7 @@ export function GameOverScreen({ navigation }: Props) {
   const play = useSounds();
   const { totalScore, roomNumber, multiplier } = game;
   const roomsCleared = roomNumber - 1;
+  const isTimeMode = game.gameMode === 'time';
 
   const [isFirstTime, setIsFirstTime] = useState<boolean | null>(null);
   const [inputName, setInputName] = useState('');
@@ -46,6 +56,7 @@ export function GameOverScreen({ navigation }: Props) {
   const btnAnim     = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    recordPlay();
     // Entrance animations
     Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
     Animated.sequence([
@@ -107,6 +118,31 @@ export function GameOverScreen({ navigation }: Props) {
   function handlePlayAgain() {
     game.restartGame();
     navigation.pop();
+  }
+
+  // ── Time Mode: just show elapsed time, no score submission ──────────────
+  if (isTimeMode) {
+    return (
+      <LinearGradient colors={['#B71C1C', '#880E4F', '#311B92']} style={styles.container}>
+        <View style={styles.inner}>
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateX: shakeAnim }] }}>
+            <Text style={styles.emoji}>💣</Text>
+            <Text style={styles.title}>BOOM!</Text>
+            <Text style={styles.subtitle}>You hit a mine</Text>
+          </Animated.View>
+
+          <Animated.View style={[styles.statsCard, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0,1], outputRange: [30,0] }) }] }]}>
+            <Stat label="Time elapsed" value={formatTime(game.timeMs)} big />
+          </Animated.View>
+
+          <Animated.View style={{ opacity: btnAnim, transform: [{ translateY: btnAnim.interpolate({ inputRange: [0,1], outputRange: [20,0] }) }] }}>
+            <TouchableOpacity style={styles.playAgainBtn} onPress={() => { game.restartGame(); navigation.pop(); }}>
+              <Text style={styles.playAgainText}>TRY AGAIN</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </LinearGradient>
+    );
   }
 
   if (isFirstTime === null) {
